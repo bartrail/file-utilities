@@ -1,0 +1,47 @@
+before_script:
+- docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
+after_script:
+- cd docker; docker-compose stop
+
+docker_php7.1_sf:
+    stage: test
+    tags:
+    - docker
+    only:
+    - master
+    script:
+    - cp docker/.env.dist docker/.env
+    - bash -c 'sed -i "/\- ..\/sql:\/var\/lib\/mysql/d" docker/docker-compose.yml.dist'
+    - bash -c 'sed -i "s/.\/logs\/nginx\//\/tmp\/nginx/g" docker/docker-compose.yml.dist'
+    - cd docker
+    - bash docker.sh -d
+    - docker exec -i -u www-data np_php bash -c "cd ../; rm -rf www; composer create-project symfony/website-skeleton www"
+    - docker-compose stop
+    - rm nginx/default.conf.dist nginx/silverstripe4.conf.dist
+    - bash docker.sh -d
+    - docker exec -i -u www-data np_php bash -c "php bin/phpunit"
+    - docker exec -i -u www-data np_php bash -c "composer require encore"
+    - docker exec -i -u www-data np_php bash -c "yarn install"
+    - docker exec -i -u www-data np_php bash -c "yarn build"
+
+docker_php7.2_sf:
+    stage: test
+    tags:
+    - docker
+    only:
+    - master
+    script:
+    - cp docker/.env.dist docker/.env
+    - bash -c 'sed -i "s/7.1/7.2/g" docker/.env'
+    - bash -c 'sed -i "/\- ..\/sql:\/var\/lib\/mysql/d" docker/docker-compose.yml.dist'
+    - bash -c 'sed -i "s/.\/logs\/nginx\//\/tmp\/nginx/g" docker/docker-compose.yml.dist'
+    - cd docker
+    - bash docker.sh -d
+    - docker exec -i -u www-data np_php bash -c "cd ../; rm -rf www; composer create-project symfony/website-skeleton www"
+    - docker-compose stop
+    - rm nginx/default.conf.dist nginx/silverstripe4.conf.dist
+    - bash docker.sh -d
+    - docker exec -i -u www-data np_php bash -c "php bin/phpunit"
+    - docker exec -i -u www-data np_php bash -c "composer require encore"
+    - docker exec -i -u www-data np_php bash -c "yarn install"
+    - docker exec -i -u www-data np_php bash -c "yarn build"
