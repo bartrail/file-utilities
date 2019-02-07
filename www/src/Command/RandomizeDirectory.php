@@ -27,7 +27,7 @@ class RandomizeDirectory extends Command
      * @var array|\SplFileInfo
      */
     protected $sourceFiles = [];
-    protected $ignore = ['.DS_Store'];
+    protected $ignore      = ['.DS_Store'];
 
     protected function configure()
     {
@@ -44,6 +44,12 @@ class RandomizeDirectory extends Command
             null,
             InputOption::VALUE_NONE,
             'If given, an already randomized folder can be re-randomized without adding a new prefix'
+        );
+        $this->addOption(
+            'remove-prefix',
+            null,
+            InputOption::VALUE_NONE,
+            'If given, an already randomized folder will be normalized by removing all prefixes'
         );
         $this->addOption(
             'ignore',
@@ -64,6 +70,13 @@ class RandomizeDirectory extends Command
             throw new \InvalidArgumentException(sprintf('Source Directory [%s] does not exist', $sourceDir));
         }
 
+        $replacePrefix = $input->getOption('replace-prefix');
+        $removePrefix  = $input->getOption('remove-prefix');
+
+        if ($replacePrefix && $removePrefix) {
+            throw new \InvalidArgumentException(sprintf("<info>replace-prefix</info> and <info>remove-prefix</info> cannot be run together"));
+        }
+
         $output->writeln(sprintf('Scanning directory [%s]', $sourceDir));
 
         $rii = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($sourceDir));
@@ -78,11 +91,8 @@ class RandomizeDirectory extends Command
 
         shuffle($this->sourceFiles);
 
-
-        $fileAmount    = count($this->sourceFiles);
-        $replacePrefix = $input->getOption('replace-prefix');
-
-        if ($replacePrefix) {
+        $fileAmount = count($this->sourceFiles);
+        if ($replacePrefix || $removePrefix) {
             $pattern = sprintf('/[0-9]{%s}%s/', strlen($fileAmount), $separator);
         }
 
@@ -100,16 +110,20 @@ class RandomizeDirectory extends Command
             }
 
             $fileName = $file->getFilename();
-            if ($replacePrefix) {
+            if ($replacePrefix || $removePrefix) {
                 if (preg_match($pattern, $file->getFilename())) {
                     $fileName = preg_replace($pattern, '', $file->getFilename());
                 }
             }
 
-            $prefix      = sprintf('%s%s', $i, $separator);
-            $newLength   = strlen($fileName) + strlen($fileAmount) + strlen($separator);
-            $newFileName = str_pad(sprintf('%s%s', $prefix, $fileName), $newLength, '0', STR_PAD_LEFT);
-            $newPathName = sprintf('%s/%s', $file->getPath(), $newFileName);
+            if ($removePrefix) {
+                $newPathName = sprintf('%s/%s', $file->getPath(), $fileName);
+            } else {
+                $prefix      = sprintf('%s%s', $i, $separator);
+                $newLength   = strlen($fileName) + strlen($fileAmount) + strlen($separator);
+                $newFileName = str_pad(sprintf('%s%s', $prefix, $fileName), $newLength, '0', STR_PAD_LEFT);
+                $newPathName = sprintf('%s/%s', $file->getPath(), $newFileName);
+            }
 
             try {
                 if ($output->isVerbose()) {
